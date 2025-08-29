@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RhythmCrew</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+    <script src="https://unpkg.com/feather-icons"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Part 1: Static Header -->
+    <div id="main-header">
+        <header>
+            <div class="header-title">
+                <h1>Rhythm Crew</h1>
+                <small id="header-song-count"></small>
+            </div>
+            <div class="header-icons">
+                <button id="theme-toggle"><i data-feather="moon"></i></button>
+                <button id="user-account">🐰</button>
+            </div>
+        </header>
+    </div>
+
+    <!-- Admin Section -->
+    <div id="admin-section" style="display: none;">
+        <h2>Admin Setup</h2>
+        <input type="file" id="song-upload" accept=".json">
+        <button id="upload-btn">Upload Songs</button>
+    </div>
+
+    <!-- Part 3: Sticky Search Bar -->
+    <div id="search-sticky-header">
+        <div class="search-bar">
+            <i data-feather="search" class="search-icon"></i>
+            <input type="text" placeholder="Search for songs, artists, or genres">
+            <i data-feather="mic" class="mic-icon"></i>
+        </div>
+    </div>
+
+    <!-- Part 4: Genre Filters (Scrollable with content) -->
+    <div class="genre-filters-container">
+        <div class="genre-filters">
+            <button id="filter-all" class="active">All</button>
+            <!-- Dynamic genre filters will be added here -->
+        </div>
+    </div>
+
+    <!-- Part 5: Song List -->
+    <div id="song-list">
+        <div class="song-grid">
+            <div class="song-card">
+                <div class="song-card-content">
+                    <img src="https://via.placeholder.com/48x48" alt="Artist Avatar">
+                    <div class="song-info">
+                        <strong>Found Song Title</strong>
+                        <p>Found Artist Name <i data-feather="check-circle" class="verified-icon"></i></p>
+                    </div>
+                </div>
+                <button class="action-button"><i data-feather="plus"></i></button>
+            </div>
+            <div class="song-card queued">
+                <div class="song-card-content">
+                    <img src="https://via.placeholder.com/48x48" alt="Artist Avatar">
+                    <div class="song-info">
+                        <strong>Another Found Song</strong>
+                        <p>Another Found Artist</p>
+                    </div>
+                </div>
+                <button class="action-button queued">Queued <i data-feather="check"></i></button>
+            </div>
+            <div class="song-card">
+                <div class="song-card-content">
+                    <img src="https://via.placeholder.com/48x48" alt="Artist Avatar">
+                    <div class="song-info">
+                        <strong>Third Found Song</strong>
+                        <p>Third Found Artist <i data-feather="check-circle" class="verified-icon"></i></p>
+                    </div>
+                </div>
+                <button class="action-button"><i data-feather="plus"></i></button>
+            </div>
+            <div class="song-card">
+                <div class="song-card-content">
+                    <img src="https://via.placeholder.com/48x48" alt="Artist Avatar">
+                    <div class="song-info">
+                        <strong>Fourth Song</strong>
+                        <p>Fourth Artist</p>
+                    </div>
+                </div>
+                <button class="action-button"><i data-feather="plus"></i></button>
+            </div>
+            <div class="song-card queued">
+                <div class="song-card-content">
+                    <img src="https://via.placeholder.com/48x48" alt="Artist Avatar">
+                    <div class="song-info">
+                        <strong>Fifth Song</strong>
+                        <p>Fifth Artist <i data-feather="check-circle" class="verified-icon"></i></p>
+                    </div>
+                </div>
+                <button class="action-button queued">Queued <i data-feather="check"></i></button>
+            </div>
+            <div class="song-card">
+                <div class="song-card-content">
+                    <img src="https://via.placeholder.com/48x48" alt="Artist Avatar">
+                    <div class="song-info">
+                        <strong>Sixth Song</strong>
+                        <p>Sixth Artist</p>
+                    </div>
+                </div>
+                <button class="action-button"><i data-feather="plus"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Queue View with Now Playing and Up Next -->
+    <div id="queue-view" class="view active">
+        <!-- Now Playing Section -->
+        <section id="now-playing">
+            <img src="https://via.placeholder.com/64x64" alt="Album Art">
+            <div class="song-info">
+                <h4>Song Title</h4>
+                <p>Artist Name</p>
+            </div>
+            <button class="play-button"><i data-feather="play"></i></button>
+            <button id="mark-played" class="admin-only">Mark as Played</button>
+            <div class="progress-bar-container">
+                <div class="progress-bar"></div>
+            </div>
+        </section>
+
+        <!-- Up Next Section with Voting -->
+        <section id="up-next">
+            <div class="section-header" id="up-next-toggle">
+                <h3>Up Next (5)</h3>
+                <i data-feather="chevron-down" class="chevron-icon"></i>
+            </div>
+            <div class="sorting-controls admin-only">
+                <button id="sort-upvotes" class="active">Upvotes</button>
+                <button id="sort-oldest">Oldest</button>
+                <button id="sort-newest">Newest</button>
+                <button id="sort-random">Random</button>
+                <button id="remove-all" class="admin-only">Remove All</button>
+            </div>
+            <div id="up-next-content" class="up-next-content expanded">
+                <ul>
+                    <li class="queue-item" data-queue-id="">
+                        <img src="https://via.placeholder.com/48x48" alt="Artist Avatar">
+                        <div class="song-info">
+                            <strong>Next Song Title</strong>
+                            <p>Next Artist Name</p>
+                            <small>Requested by: <span class="requester">User</span></small>
+                        </div>
+                        <div class="vote-buttons">
+                            <button class="vote-btn upvote"><i data-feather="thumbs-up"></i></button>
+                            <button class="vote-btn downvote"><i data-feather="thumbs-down"></i></button>
+                        </div>
+                        <button class="remove-btn admin-only"><i data-feather="x"></i></button>
+                    </li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Recently Played Section -->
+        <section id="recently-played">
+            <h3>Recently Played</h3>
+            <ul id="history-list">
+                <!-- History items will be populated here -->
+            </ul>
+        </section>
+    </div>
+
+    <!-- Empty Search View (for navigation) -->
+    <div id="search-view" class="view"></div>
+
+    <!-- User Modal -->
+    <div id="user-modal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-description">
+        <div class="modal-content">
+            <h3 id="modal-title">Change Avatar & Name</h3>
+            <div id="modal-description" class="sr-only">Update your display name and choose an avatar emoji to represent yourself in the application.</div>
+            <div class="modal-section">
+                <label for="user-name-input">Name (optional):</label>
+                <input type="text" id="user-name-input" placeholder="Enter your name" aria-describedby="name-help">
+                <div id="name-help" class="sr-only">Optional display name that will be shown with your avatar</div>
+            </div>
+            <div class="modal-section">
+                <label>Choose Avatar:</label>
+                <div class="avatar-grid" role="radiogroup" aria-labelledby="avatar-label">
+                    <div id="avatar-label" class="sr-only">Select an emoji avatar to represent yourself</div>
+                    <button class="avatar-option" role="radio" aria-label="Rabbit avatar">🐰</button>
+                    <button class="avatar-option" role="radio" aria-label="Panda avatar">🐼</button>
+                    <button class="avatar-option" role="radio" aria-label="Koala avatar">🐨</button>
+                    <button class="avatar-option" role="radio" aria-label="Penguin avatar">🐧</button>
+                    <button class="avatar-option" role="radio" aria-label="Eagle avatar">🦅</button>
+                    <button class="avatar-option" role="radio" aria-label="Owl avatar">🦉</button>
+                    <button class="avatar-option" role="radio" aria-label="Unicorn avatar">🦄</button>
+                    <button class="avatar-option" role="radio" aria-label="Butterfly avatar">🦋</button>
+                    <button class="avatar-option" role="radio" aria-label="Ladybug avatar">🐞</button>
+                    <button class="avatar-option" role="radio" aria-label="Dolphin avatar">🐬</button>
+                    <button class="avatar-option" role="radio" aria-label="Zebra avatar">🦓</button>
+                    <button class="avatar-option" role="radio" aria-label="Llama avatar">🦙</button>
+                    <button class="avatar-option" role="radio" aria-label="Deer avatar">🦌</button>
+                    <button class="avatar-option" role="radio" aria-label="Swan avatar">🦢</button>
+                    <button class="avatar-option" role="radio" aria-label="Flamingo avatar">🦩</button>
+                    <button class="avatar-option" role="radio" aria-label="Otter avatar">🦦</button>
+                    <button class="avatar-option" role="radio" aria-label="Hedgehog avatar">🦔</button>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="save-user-settings">Save</button>
+                <button id="cancel-user-settings">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Part 6: Footer -->
+    <footer>
+        <button id="search-nav" class="active">
+            <i data-feather="search"></i>
+            <span>Search</span>
+        </button>
+        <button id="queue-nav">
+            <i data-feather="list"></i>
+            <span>Queue</span>
+        </button>
+    </footer>
+
+    <script src="https://unpkg.com/feather-icons"></script>
+    <script src="js/theme.js"></script>
+    <script src="js/navigation.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
