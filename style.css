@@ -27,7 +27,6 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    padding-top: 64px;
     box-sizing: border-box;
     /* Use GPU acceleration for better performance */
     transform: translateZ(0);
@@ -117,7 +116,7 @@ p {
 #search-sticky-header {
     position: sticky;
     top: 64px; /* Height of the main header */
-    z-index: 1002; /* Between header (1003) and footer (1001) */
+    z-index: 1004; /* Increased to be above all other sticky elements */
     background-color: var(--bg-color);
     border-bottom: 1px solid var(--border-color);
     padding: 8px 16px;
@@ -358,10 +357,10 @@ header h1, header h2 {
 .song-card {
     background-color: var(--component-bg-color);
     border-radius: 6px;
-    padding: 2px;
+    padding: 12px; /* Increased from 2px to provide more space for larger text */
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 12px; /* Increased from 2px to match padding */
     transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
     position: relative;
     overflow: hidden;
@@ -385,7 +384,7 @@ header h1, header h2 {
 
 .song-card.queued {
     border: 1px solid var(--secondary-accent) !important;
-    background: linear-gradient(135deg, var(--component-bg-color) 0%, rgba(46, 119, 208, 0.08) 100%) !important;
+    background: linear-gradient(90deg, var(--component-bg-color) 0% 50%, rgba(46, 119, 208, 0.08) 50% 100%) !important;
     position: relative;
     overflow: hidden;
     box-shadow: 0 1px 4px rgba(46, 119, 208, 0.15) !important;
@@ -417,6 +416,36 @@ header h1, header h2 {
     flex-shrink: 0;
 }
 
+.song-card img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* Artist initial fallbacks */
+.artist-initial,
+.artist-initial-large {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, var(--primary-accent), var(--secondary-accent));
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 16px;
+    text-transform: uppercase;
+}
+
+/* Larger artist initial for now-playing section */
+.artist-initial-large {
+    width: 64px;
+    height: 64px;
+    font-size: 24px;
+}
 .song-card .song-info {
     flex-grow: 1;
 }
@@ -428,8 +457,8 @@ header h1, header h2 {
     text-overflow: ellipsis;
     max-width: 100%;
     min-width: 0; /* Allow flex item to shrink below its content size */
-    font-size: 0.95rem;
-    line-height: 1.2;
+    font-size: 1.14rem; /* 20% increase from 0.95rem */
+    line-height: 1.44; /* Proportional increase */
 }
 
 .song-card .song-info p {
@@ -440,8 +469,8 @@ header h1, header h2 {
     max-width: 100%;
     opacity: 0.7;
     min-width: 0; /* Allow flex item to shrink below its content size */
-    font-size: 0.85rem;
-    line-height: 1.1;
+    font-size: 1.02rem; /* 20% increase from 0.85rem */
+    line-height: 1.32; /* Proportional increase */
 }
 
 .song-card .action-button {
@@ -855,6 +884,80 @@ header h1, header h2 {
     width: auto;
     padding: 0 12px;
     font-size: 0.875rem;
+}
+
+/* Instrument Filters */
+.instrument-filters-container {
+    padding: 0 16px 8px 16px;
+    background-color: var(--bg-color);
+    position: relative;
+}
+
+.instrument-filters {
+    display: flex;
+    gap: 8px; /* Tighter spacing for icon buttons */
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 6px;
+    scroll-behavior: smooth;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+}
+
+.instrument-filters::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, and Opera */
+}
+
+.instrument-filters button {
+    background-color: var(--component-bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 50%; /* Circular buttons for icons */
+    width: 48px; /* Slightly larger than genre buttons */
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+    flex-shrink: 0;
+    /* Use GPU acceleration */
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    overflow: hidden;
+}
+
+.instrument-filters button:hover {
+    background-color: var(--border-color);
+    transform: translateY(-1px);
+    border-color: var(--secondary-accent);
+}
+
+.instrument-filters button.active {
+    background-color: var(--primary-accent);
+    border-color: var(--primary-accent);
+    box-shadow: 0 2px 8px rgba(29, 185, 84, 0.3);
+}
+
+.instrument-filters button.active:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(29, 185, 84, 0.4);
+}
+
+.instrument-filters .instrument-icon {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+}
+
+.instrument-filters button:hover .instrument-icon {
+    opacity: 1;
+}
+
+.instrument-filters button.active .instrument-icon {
+    opacity: 1;
+    filter: brightness(0) invert(1); /* White icon on green background */
 }
 
 /* Footer Navigation */

@@ -7,6 +7,8 @@ let history = [];
 let queuedSongIds = new Set(); // Track queued song IDs for UI feedback
 let cleanedSongsCache = null; // Cache for cleaned and deduplicated songs
 let genreDataCache = null; // Cache for genre analysis data
+let artistImageCache = {}; // Cache for artist images from server
+let pendingArtistRequests = new Set(); // Track pending artist image requests
 
 // Pagination state for infinite scroll
 let currentPage = 0;
@@ -15,6 +17,7 @@ let isLoadingMore = false;
 let hasMoreSongs = true;
 let currentSearchQuery = '';
 let currentActiveGenres = ['all'];
+let currentActiveInstruments = [];
 
 // Optimized feather replacement to batch multiple calls
 function scheduleFeatherReplace() {
@@ -139,6 +142,11 @@ function connectWebSocket() {
                 case 'vote_updated':
                     // Handle real-time vote updates
                     updateQueueItem(data.queue_id, data.upvotes, data.downvotes);
+                    break;
+
+                case 'artist_images':
+                    // Handle artist images response
+                    handleArtistImagesResponse(data);
                     break;
 
                 default:
@@ -355,7 +363,7 @@ function setupEventListeners() {
                     queuedSongIds.add(songId);
                     songCard.classList.add('queued');
                     btn.classList.add('queued');
-                    btn.innerHTML = '<span>Queued</span> <i data-feather="check"></i>';
+                    btn.innerHTML = '<i data-feather="check"></i>';
                     btn.disabled = true;
                     scheduleFeatherReplace();
 
@@ -620,7 +628,10 @@ function renderSongs(append = false) {
 
             songCard.innerHTML = `
                 <div class="song-card-content">
-                    <img src="https://via.placeholder.com/48x48" alt="Album Art">
+                    ${getArtistImage(song.cleanedArtist).startsWith('http') ?
+                        `<img src="${getArtistImage(song.cleanedArtist)}" alt="Artist Image">` :
+                        `<div class="artist-initial">${getArtistImage(song.cleanedArtist)}</div>`
+                    }
                     <div class="song-info">
                         <strong title="${song.name}">${song.cleanedName}</strong>
                         <p title="${song.artist}">${song.cleanedArtist}</p>
@@ -631,7 +642,6 @@ function renderSongs(append = false) {
                     <button class="action-button request-btn ${isQueued ? 'queued' : ''}" data-song-id="${song.id}" ${isQueued ? 'disabled' : ''}>
                         ${isQueued ? '<span>Queued</span> <i data-feather="check"></i>' : '<i data-feather="plus"></i>'}
                     </button>
-                    <span class="tooltip-text">${isQueued ? 'Click to remove from queue' : 'Click to add to queue'}</span>
                 </div>
             `;
             fragment.appendChild(songCard);
@@ -648,6 +658,44 @@ function renderSongs(append = false) {
 
     // Defer feather replacement for better performance
     scheduleFeatherReplace();
+}
+
+function filterSongsByInstrumentation(song) {
+    if (currentActiveInstruments.length === 0) {
+        return true; // No instrument filters active
+    }
+
+    // Check if song has instruments data
+    if (!song.instruments) {
+        return false;
+    }
+
+    // Parse instruments string (e.g., "1,Yes,Yes,Solo")
+    const instruments = song.instruments.split(',');
+
+    // Check each active instrument filter
+    return currentActiveInstruments.every(instrument => {
+        switch (instrument) {
+            case 'guitar':
+                return instruments[0] === '1' || instruments[0] === '2';
+
+            case 'bass':
+                return instruments[1] === 'Yes';
+
+            case 'drums':
+                return instruments[2] === 'Yes';
+
+            case 'vocals':
+                return instruments[3] === 'Solo' || instruments[3] === 'Harmony';
+
+            case 'keys':
+                // Leave non-functional for now as per specs
+                return true;
+
+            default:
+                return true;
+        }
+    });
 }
 
 function filterSongsByCriteria(songsArray) {
@@ -678,7 +726,9 @@ function filterSongsByCriteria(songsArray) {
             });
         }
 
-        return matchesSearch && matchesGenre;
+        const matchesInstruments = filterSongsByInstrumentation(song);
+
+        return matchesSearch && matchesGenre && matchesInstruments;
     });
 }
 
@@ -779,8 +829,12 @@ function renderQueue() {
 
     if (queue.length > 0) {
         const nowPlayingSong = queue[0];
+        const artistImage = getArtistImage(cleanArtistName(nowPlayingSong.artist));
         nowPlaying.innerHTML = `
-            <img src="https://via.placeholder.com/64x64" alt="Album Art">
+            ${artistImage.startsWith('http') ?
+                `<img src="${artistImage}" alt="Artist Image">` :
+                `<div class="artist-initial artist-initial-large">${artistImage}</div>`
+            }
             <div class="song-info">
                 <h4>${nowPlayingSong.name}</h4>
                 <p>${nowPlayingSong.artist}</p>
@@ -811,8 +865,12 @@ function renderQueue() {
                     li.classList.add('draggable-queue-item');
                 }
                 const requesterDisplay = item.user_name ? `${item.user_avatar} ${item.user_name}` : item.user_avatar;
+                const queueArtistImage = getArtistImage(cleanArtistName(item.artist));
                 li.innerHTML = `
-                    <img src="https://via.placeholder.com/48x48" alt="Artist Avatar">
+                    ${queueArtistImage.startsWith('http') ?
+                        `<img src="${queueArtistImage}" alt="Artist Image">` :
+                        `<div class="artist-initial">${queueArtistImage}</div>`
+                    }
                     <div class="song-info">
                         <strong>${item.name}</strong>
                         <p>${item.artist}</p>
@@ -860,7 +918,6 @@ function renderHistory() {
                 <button class="action-button request-btn" data-song-id="" aria-label="Request this song">
                     <i data-feather="plus"></i>
                 </button>
-                <span class="tooltip-text">Click to request this song</span>
             </div>
         `;
         historyList.appendChild(li);
@@ -874,6 +931,78 @@ function formatDuration(ms) {
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+// Get artist image or fallback to initial
+function getArtistImage(artistName) {
+    if (!artistName) return '?';
+
+    // Check if we have a cached image URL
+    const cached = artistImageCache[artistName];
+    if (cached) {
+        return cached.startsWith('http') ? cached : cached; // Return image URL or initial fallback
+    }
+
+    // If no cached value but not pending, request it
+    if (!pendingArtistRequests.has(artistName)) {
+        requestArtistImages([artistName]);
+    }
+
+    // Return initial fallback while waiting
+    return artistName[0].toUpperCase();
+}
+
+// Request artist images from server
+function requestArtistImages(artists) {
+    if (!artists || artists.length === 0) return;
+
+    // Filter out artists that are already cached or pending
+    const uncachedArtists = artists.filter(artist =>
+        !artistImageCache.hasOwnProperty(artist) && !pendingArtistRequests.has(artist)
+    );
+
+    if (uncachedArtists.length === 0) return;
+
+    // Mark as pending
+    uncachedArtists.forEach(artist => pendingArtistRequests.add(artist));
+
+    // Send request to server
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        sendWebSocketMessage({
+            action: 'lookup_artist_images',
+            artists: uncachedArtists
+        });
+    } else {
+        // If not connected, just use fallbacks
+        uncachedArtists.forEach(artist => {
+            artistImageCache[artist] = artist[0].toUpperCase();
+            pendingArtistRequests.delete(artist);
+        });
+    }
+}
+
+// Handle artist images response from server
+function handleArtistImagesResponse(data) {
+    const { results } = data;
+
+    if (results) {
+        // Update cache with server results
+        Object.entries(results).forEach(([artist, imageUrl]) => {
+            artistImageCache[artist] = imageUrl;
+            pendingArtistRequests.delete(artist);
+        });
+    }
+
+    // Re-render UI with updated images
+    if (songs.length > 0) {
+        renderSongs();
+    }
+    if (queue.length > 0) {
+        renderQueue();
+    }
+    if (history.length > 0) {
+        renderHistory();
+    }
 }
 
 // Genre grouping configuration

@@ -76,6 +76,29 @@ document.addEventListener('DOMContentLoaded', () => {
             renderSongs();
         });
     });
+
+    // Instrument filter selection logic
+    const instrumentFilters = document.querySelectorAll('.instrument-filter');
+
+    instrumentFilters.forEach(button => {
+        button.addEventListener('click', () => {
+            const instrument = button.dataset.instrument;
+
+            // Toggle the instrument filter
+            button.classList.toggle('active');
+
+            // Update global filter state
+            const activeInstrumentButtons = document.querySelectorAll('.instrument-filter.active');
+            currentActiveInstruments = Array.from(activeInstrumentButtons).map(btn => btn.dataset.instrument);
+
+            // Reset pagination and re-render
+            currentPage = 0;
+            isLoadingMore = false;
+            hasMoreSongs = true;
+
+            renderSongs();
+        });
+    });
 });
 
 function filterSongs(query) {
@@ -85,6 +108,9 @@ function filterSongs(query) {
     // Update global filter state
     currentSearchQuery = query.toLowerCase();
     currentActiveGenres = activeGenres;
+
+    // Keep current instrument filters when search changes
+    // (they are already set in the file scope by instrument filter event listeners)
 
     // Reset pagination and re-render
     currentPage = 0;
