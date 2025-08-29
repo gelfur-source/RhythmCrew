@@ -1,0 +1,34 @@
+
+## UI/UX Enhancements
+
+### 1. Instrument Icon Sizing (Revised)
+* **Problem**: The instrument icons have excessive white padding within their circular containers, not utilizing the full space. 
+* **Action**: Modify the CSS to make the **black icon image fill the entire circular area**, effectively removing the white padding around them.
+* **Implementation**:
+    * Target the `<img>` elements within the instrument filter buttons.
+    * Ensure the `width` and `height` of the `<img>` are set to `100%` of their parent container.
+    * Crucially, apply `object-fit: cover;` to the `<img>`. This property will tell the image to cover the entire content box, potentially clipping parts of the image if its aspect ratio does not match the container's. Given these are circular containers, `cover` should achieve the desired full-fill effect by scaling the shortest side to fill.
+    * You might also need to check if any `padding` on the `<img>` itself or its immediate parent `<div>` or `<a>` tag is causing the white space and remove it if present.
+	
+	
+	## UI/UX Enhancement: Visual Indicator for Selected Icons
+
+* **Problem**: When a filter icon is selected, it disappears and is replaced by a solid green circle, which is visually disruptive.
+* **Action**: Implement a modern, non-disruptive visual indicator for the "selected" state by adding a colored ring around the icon. 
+* **Implementation**:
+    1.  **Icon Visibility**: Modify the CSS to ensure the instrument icon `<img>` is **always visible**, regardless of its selection state.
+    2.  **Inactive State**: For unselected icons, apply a transparent border (e.g., `border: 3px solid transparent;`) to prevent the page layout from shifting when another icon is selected.
+    3.  **Active State**: For a selected icon, apply a CSS class that adds a visible green border (e.g., `border: 3px solid #2E8B57;`) while keeping the icon's white background unchanged.
+
+---
+
+## Bug Fix & Debugging: Instrument Filter Logic
+
+* **Problem**: Selecting an instrument filter incorrectly returns zero songs ("No songs match your search").
+* **Action**: Add comprehensive **debugging logs** to the browser's developer console to trace the filtering function's logic and identify the point of failure. 
+* **Implementation**:
+    1.  Locate the JavaScript function responsible for filtering the song list.
+    2.  At the **start** of the function, log the array of currently selected instrument filters to confirm the input is correct.
+        * Example: `console.log("Filtering with instruments:", activeFiltersArray);`
+    3.  **Inside the loop** that iterates over each song, log the data being compared and the boolean result of the match for that specific song.
+        * Example: `console.log("Checking:", song.Name, "| Instruments data:", song.instruments, "| Match:", isMatch);`

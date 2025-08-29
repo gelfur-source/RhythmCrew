@@ -7,6 +7,10 @@
     --border-color: #E9ECEF;
     --primary-accent: #1DB954; /* Green */
     --secondary-accent: #2E77D0; /* Blue */
+
+    /* Layout Variables */
+    --header-height: 64px;
+    --header-padding: 16px;
 }
 
 body.dark-mode {
@@ -115,14 +119,14 @@ p {
 /* Search Header (Part 3) */
 #search-sticky-header {
     position: sticky;
-    top: 64px; /* Height of the main header */
+    top: var(--header-height); /* Use CSS variable for consistent header height */
     z-index: 99; /* Below main header to prevent layering issues */
     background-color: var(--bg-color);
     border-bottom: 1px solid var(--border-color);
     padding: 8px 16px;
     margin-top: 0;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    backdrop-filter: blur(10px); /* Add subtle blur effect */
+    /* Removed backdrop-filter to prevent jitter during scrolling */
 }
 
 #search-sticky-header .search-bar {
@@ -647,16 +651,16 @@ header h1, header h2 {
         #main-header {
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
         }
-    
+
         #search-sticky-header {
-            top: 56px; /* Slightly smaller header on mobile */
+            top: 56px; /* Smaller header on mobile - consistent with variable */
         }
-    
+
         footer {
             padding: 12px 0; /* Larger touch targets on mobile */
             box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
         }
-    
+
         .toast {
             bottom: 100px; /* More space above footer on mobile */
             max-width: 85vw; /* Responsive width */
@@ -666,10 +670,10 @@ header h1, header h2 {
     
     @media (max-width: 480px) {
         #search-sticky-header {
-            top: 52px;
+            top: 52px; /* Even smaller header on very small mobile */
             padding: 6px 12px;
         }
-    
+
         .toast {
             bottom: 110px;
             font-size: 14px;
@@ -944,9 +948,11 @@ header h1, header h2 {
 .instrument-filters .instrument-icon {
     width: 100%;
     height: 100%;
-    object-fit: contain;
+    object-fit: contain; /* Scales 96x96px icons to fit 48x48px containers */
     opacity: 0.8;
     transition: opacity 0.2s ease;
+    /* Center circular border effect within icon space */
+    border-radius: 50%; /* Ensures circular scaling */
 }
 
 .instrument-filters button:hover .instrument-icon {

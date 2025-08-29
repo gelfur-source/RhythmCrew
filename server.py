@@ -8,6 +8,18 @@ import signal
 import sys
 from datetime import datetime
 
+import re
+import csv
+import time
+import asyncio
+
+# Optional external API import - server will work without it
+try:
+    import aiohttp  # For external API calls
+    AIOHTTP_AVAILABLE = True
+except ImportError:
+    AIOHTTP_AVAILABLE = False
+    aiohttp = None
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -71,6 +83,263 @@ def init_db():
 
 init_db()
 
+# Connected clients
+clients = {}
+admin_clients = set()
+
+# Artist image cache to avoid repeated CSV lookups
+artist_image_cache = {}
+owner_lookup_cache = {}  # owner -> cleaned_artist mapping
+
+def load_artist_database():
+    """Load and cache the entire artist database at startup for fast lookups"""
+    global owner_lookup_cache, artist_image_cache
+
+    try:
+        with open('Global Music Artists.csv', 'r', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+
+            count = 0
+            for row in reader:
+                csv_artist = row.get('artist_name', '').strip()
+                csv_image = row.get('artist_img', '').strip()
+
+                if csv_artist and csv_image and csv_image.startswith('http'):
+                    count += 1
+                    # Store mapping from cleaned artist to possible matches
+                    cleaned_artist = clean_artist_name(csv_artist)
+                    if cleaned_artist not in owner_lookup_cache:
+                        owner_lookup_cache[cleaned_artist] = []
+                    owner_lookup_cache[cleaned_artist].append({
+                        'original_artist': csv_artist,
+                        'image': csv_image
+                    })
+
+                    # Cache the original name also for exact matches
+                    artist_image_cache[csv_artist] = csv_image
+                    artist_image_cache[cleaned_artist] = csv_image  # Also cache cleaned version for direct lookup
+
+                    if count <= 5:  # Log first few entries for debugging
+                        logger.debug(f"Loaded artist: '{csv_artist}' -> '{cleaned_artist}' -> {csv_image[:50]}...")
+
+        logger.info(f"Preloaded {len(owner_lookup_cache)} artist entries from database ({count} valid images)")
+
+        # Log some sample artifacts for debugging
+        if owner_lookup_cache:
+            sample_key = list(owner_lookup_cache.keys())[0]
+            logger.debug(f"Sample lookup cache entry: '{sample_key}' -> {len(owner_lookup_cache[sample_key])} matches")
+
+    except FileNotFoundError:
+        logger.warning("Global Music Artists.csv file not found at startup")
+    except Exception as e:
+        logger.error(f"Error loading artist database at startup: {e}")
+
+def test_artist_lookup():
+    """Quick test function to verify artist lookup is working"""
+    test_artists = ['Coldplay', 'Radiohead', 'Red Hot Chili Peppers']  # Known artists from CSV
+
+    logging.info("=== TESTING ARTIST LOOKUP ===")
+    logging.getLogger().setLevel(logging.DEBUG)
+
+    result = lookup_artist_images(test_artists)
+
+    for artist, image in result.items():
+        if image.startswith('http'):
+            logging.info(f"✓ {artist}: Found image")
+        else:
+            logging.warning(f"✗ {artist}: No image found, using initial '{image}'")
+
+    logging.getLogger().setLevel(logging.INFO)
+    logging.info("=== TEST COMPLETE ===")
+
+def clean_artist_name(artist):
+    """
+    Clean artist name for consistent matching.
+    Remove content within parentheses and brackets, trim whitespace.
+    Prioritize primary artist by splitting featuring/feat patterns.
+    """
+    if not artist:
+        return ''
+
+    original_artist = artist
+
+    # Split on featuring/feat patterns and take primary artist
+    # This handles cases like "Artist A featuring Artist B" -> "Artist A"
+    patterns = [
+        r'\s+featuring\s+', r'\s+feat\.?\s+', r'\s+f\.', r'\s+ft\.?\s+',
+        r'\s+with\s+', r'\s+&\s+', r'\s+x\s+', r'\s+vs\.?\s+', r'\s+versus\s+'
+    ]
+
+    for pattern in patterns:
+        artist = re.split(pattern, artist, flags=re.IGNORECASE)[0]
+
+    # Remove content within parentheses and brackets
+    artist = re.sub(r'\s*\([^)]*\)', '', artist)
+    artist = re.sub(r'\s*\[[^\]]*\]', '', artist)
+
+    # Remove "The " prefix for consistent matching
+    artist = re.sub(r'^The\s+', '', artist, flags=re.IGNORECASE)
+
+    # Trim and lowercase for consistent matching
+    cleaned = artist.strip().lower()
+
+    # Debug logging
+    if original_artist != artist:
+        logging.debug(f"Cleaned artist name from '{original_artist}' to '{cleaned}'")
+
+    return cleaned
+
+def fuzzy_match_names(query_name, target_name):
+    """
+    Perform fuzzy matching between query and target artist names.
+    Uses case-insensitive partial matching and similarity scoring.
+    """
+    if not query_name or not target_name:
+        return 0.0
+
+    query_lower = query_name.lower().strip()
+    target_lower = target_name.lower().strip()
+
+    # Exact match gets highest score
+    if query_lower == target_lower:
+        return 1.0
+
+    # Partial match (substring) gets high score
+    if query_lower in target_lower or target_lower in query_lower:
+        return 0.85
+
+    # Word boundary matching for partial artist names
+    query_words = set(query_lower.split())
+    target_words = set(target_lower.split())
+
+    # If all query words are in target words, it's a good match
+    if query_words.issubset(target_words):
+        return 0.75
+
+    # Check individual words for partial matches
+    for query_word in query_words:
+        for target_word in target_words:
+            if query_word in target_word or target_word in query_word:
+                return min(0.6, 0.6 * (len(query_word) / len(target_word)) if len(target_word) > 0 else 0.4)
+
+    return 0.0
+
+async def fetch_artist_image_online(artist_name, client_session=None):
+    """Fetch artist image from online APIs as fallback"""
+    try:
+        # Try MusicBrainz API first
+        search_url = f"https://musicbrainz.org/ws/2/artist?query=artist:{artist_name}&fmt=json"
+
+        if not client_session:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(search_url, timeout=5) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if 'artists' in data and data['artists']:
+                            artist_id = data['artists'][0]['id']
+                            # Get detailed artist info
+                            detail_url = f"https://musicbrainz.org/ws/2/artist/{artist_id}?inc=release-groups&fmt=json"
+                            async with session.get(detail_url, timeout=5) as response:
+                                if response.status == 200:
+                                    detail_data = await response.json()
+                                    # Try to find associated images (this is simplified)
+                                    # In practice, would need more complex image fetching logic
+                                    logging.debug(f"Found MusicBrainz entry for '{artist_name}'")
+                                    return f"https://musicbrainz.org/images/artist/{artist_id}"
+
+        return None
+    except Exception as e:
+        logging.debug(f"Online lookup failed for '{artist_name}': {e}")
+        return None
+
+def lookup_artist_images(artists):
+    """
+    Fast lookup artist images using preloaded cache with fuzzy matching.
+    Returns dict mapping artist names to image URLs or initial fallbacks.
+    """
+    start_time = time.time()
+    results = {}
+    requests_processed = 0
+
+    logging.debug(f"Processing {len(artists)} artist queries")
+    logging.debug(f"Available lookup cache keys: {len(owner_lookup_cache)}")
+    logging.debug(f"Available image cache entries: {len(artist_image_cache)}")
+
+    for artist in artists:
+        logging.debug(f"Processing artist: '{artist}'")
+        if artist not in artist_image_cache:
+            # Try direct cache hit first (original names)
+            clean_name = clean_artist_name(artist)
+            logging.debug(f"  Cleaned: '{clean_name}'")
+
+            match_found = False
+
+            # 1. Direct match from cached original names
+            if clean_name in artist_image_cache:
+                results[artist] = artist_image_cache[clean_name]
+                artist_image_cache[artist] = artist_image_cache[clean_name]
+                match_found = True
+                logging.debug(f"  ✓ Direct cache match found")
+
+            # 2. Exact match in lookup cache (cleaned names)
+            if not match_found and clean_name in owner_lookup_cache:
+                if owner_lookup_cache[clean_name]:
+                    entry = owner_lookup_cache[clean_name][0]
+                    results[artist] = entry['image']
+                    artist_image_cache[artist] = entry['image']
+                    logging.debug(f"  ✓ Lookup cache match found: '{entry['original_artist']}'")
+                    match_found = True
+
+            # 3. Fuzzy matching if no exact match
+            if not match_found:
+                best_match = None
+                best_score = 0.0
+
+                # Check all possible matches in our preloaded data
+                for clean_key, entries in owner_lookup_cache.items():
+                    score = fuzzy_match_names(clean_name, clean_key)
+                    if score > 0.6 and score > best_score:  # Lower threshold for debugging
+                        best_match = entries[0]
+                        best_score = score
+                        logging.debug(f"  Possible fuzzy match: '{clean_key}' (score: {best_score:.3f})")
+
+                if best_match and best_score >= 0.6:
+                    results[artist] = best_match['image']
+                    artist_image_cache[artist] = best_match['image']
+                    logging.debug(f"  ✓ Fuzzy match found: '{best_match['original_artist']}', score: {best_score:.3f}")
+                    match_found = True
+                elif best_score > 0:
+                    logging.debug(f"  Low confidence match rejected (score: {best_score:.3f})")
+
+            # 4. Additional fallback: try case-insensitive original name match
+            if not match_found:
+                # Try case-insensitive lookup in original artist names
+                for original_cached_artist, image_url in artist_image_cache.items():
+                    if original_cached_artist.lower() == artist.lower():
+                        results[artist] = image_url
+                        artist_image_cache[artist] = image_url
+                        match_found = True
+                        logging.debug(f"  ✓ Case-insensitive original match: '{original_cached_artist}'")
+                        break
+
+            # 5. Final fallback to initial
+            if not match_found:
+                results[artist] = artist[0].upper() if artist else '?'
+                logging.debug(f"  ✗ No match found, using initial: '{results[artist]}'")
+        else:
+            # Direct cache hit
+            results[artist] = artist_image_cache[artist]
+            logging.debug(f"  ✓ Cached result found")
+
+        requests_processed += 1
+
+    elapsed = time.time() - start_time
+
+    # Log performance and results
+    found = sum(1 for result in results.values() if result.startswith('http'))
+    logging.info(f"Artist lookup completed: {requests_processed} processed, {found} images found, took {elapsed:.3f}s")
+
+    return results
 # Connected clients
 clients = {}
 admin_clients = set()
@@ -145,6 +414,20 @@ async def handle_message(websocket, message):
             conn.close()
             # Send current state
             await send_state(websocket)
+
+        elif action == 'request_song':
+            song_id = data['song_id']
+            user_id = clients[websocket]['user_id']
+            # Add to queue
+            conn = sqlite3.connect('rhythmcrew.db')
+        elif action == 'lookup_artist_images':
+            artists = data.get('artists', [])
+            if artists:
+                image_results = lookup_artist_images(artists)
+                await websocket.send(json.dumps({
+                    'action': 'artist_images',
+                    'results': image_results
+                }))
 
         elif action == 'request_song':
             song_id = data['song_id']
@@ -451,6 +734,15 @@ async def main():
     stats_task = asyncio.create_task(log_server_stats())
 
     try:
+        # Load artist database before starting server
+        logger.info("Loading artist database...")
+        # Temporarily increase logging level to see CSV loading output
+        old_level = logging.getLogger().level
+        logging.getLogger().setLevel(logging.DEBUG)
+        load_artist_database()
+        logging.getLogger().setLevel(old_level)
+        logger.info("Database loading completed")
+
         logger.info("Initializing WebSocket server...")
         server_instance = await websockets.serve(
             handler,
@@ -467,6 +759,9 @@ async def main():
         logger.info("  - HTTP fallback: http://localhost:8000")
         logger.info("  - Open index.html in your browser to use the application")
         logger.info("  - Press Ctrl+C to stop the server gracefully")
+
+        # Optional: Run artist lookup test
+        # test_artist_lookup()
 
         # Wait for server to close
         await server_instance.wait_closed()
