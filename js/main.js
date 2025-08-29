@@ -223,6 +223,23 @@ function updateState(state) {
         hasMoreSongs = true;
         currentSearchQuery = '';
         currentActiveGenres = ['all'];
+        currentActiveInstruments = []; // Reset instrument filters when songs change
+
+        // Clear active state from UI instrument filter buttons
+        const activeInstrumentButtons = document.querySelectorAll('.instrument-filter.active');
+        activeInstrumentButtons.forEach(button => {
+            button.classList.remove('active');
+        });
+
+        // Ensure instrument filter buttons reflect the empty state
+        setTimeout(() => {
+            const instrumentButtons = document.querySelectorAll('.instrument-filter');
+            instrumentButtons.forEach(button => {
+                if (button.classList.contains('active')) {
+                    button.classList.remove('active');
+                }
+            });
+        }, 50); // Small delay to ensure DOM is ready
     }
 
     songs = newSongs;
@@ -629,7 +646,7 @@ function renderSongs(append = false) {
             songCard.innerHTML = `
                 <div class="song-card-content">
                     ${getArtistImage(song.cleanedArtist).startsWith('http') ?
-                        `<img src="${getArtistImage(song.cleanedArtist)}" alt="Artist Image">` :
+                        `<img src="${getArtistImage(song.cleanedArtist)}" alt="Artist Image" data-artist-name="${song.cleanedArtist}">` :
                         `<div class="artist-initial">${getArtistImage(song.cleanedArtist)}</div>`
                     }
                     <div class="song-info">
@@ -644,6 +661,15 @@ function renderSongs(append = false) {
                     </button>
                 </div>
             `;
+
+            // Add error logging for failed artist images
+            const artistImage = songCard.querySelector('img[data-artist-name]');
+            if (artistImage) {
+                artistImage.addEventListener('error', (e) => {
+                    const artistName = e.target.getAttribute('data-artist-name');
+                    console.warn(`Image load failed for artist: ${artistName}`);
+                });
+            }
             fragment.appendChild(songCard);
         });
 
@@ -661,6 +687,9 @@ function renderSongs(append = false) {
 }
 
 function filterSongsByInstrumentation(song) {
+    // Add debugging logs
+    console.log('Active instrument filters:', currentActiveInstruments);
+
     if (currentActiveInstruments.length === 0) {
         return true; // No instrument filters active
     }
@@ -677,22 +706,31 @@ function filterSongsByInstrumentation(song) {
     return currentActiveInstruments.every(instrument => {
         switch (instrument) {
             case 'guitar':
-                return instruments[0] === '1' || instruments[0] === '2';
+                const guitarResult = instruments[0] === '1' || instruments[0] === '2';
+                console.log('Checking song:', song.name || 'Unknown', 'with instruments:', song.instruments, 'Guitar result:', guitarResult);
+                return guitarResult;
 
             case 'bass':
-                return instruments[1] === 'Yes';
+                const bassResult = instruments[1] === 'Yes';
+                console.log('Checking song:', song.name || 'Unknown', 'with instruments:', song.instruments, 'Bass result:', bassResult);
+                return bassResult;
 
             case 'drums':
-                return instruments[2] === 'Yes';
+                const drumsResult = instruments[2] === 'Yes';
+                console.log('Checking song:', song.name || 'Unknown', 'with instruments:', song.instruments, 'Drums result:', drumsResult);
+                return drumsResult;
 
             case 'vocals':
-                return instruments[3] === 'Solo' || instruments[3] === 'Harmony';
+                const vocalsResult = instruments[3] === 'Solo' || instruments[3] === 'Harmony';
+                console.log('Checking song:', song.name || 'Unknown', 'with instruments:', song.instruments, 'Vocals result:', vocalsResult);
+                return vocalsResult;
 
             case 'keys':
                 // Leave non-functional for now as per specs
                 return true;
 
             default:
+                console.log('Checking song:', song.name || 'Unknown', 'Unknown instrument filter:', instrument);
                 return true;
         }
     });
@@ -832,7 +870,7 @@ function renderQueue() {
         const artistImage = getArtistImage(cleanArtistName(nowPlayingSong.artist));
         nowPlaying.innerHTML = `
             ${artistImage.startsWith('http') ?
-                `<img src="${artistImage}" alt="Artist Image">` :
+                `<img src="${artistImage}" alt="Artist Image" data-artist-name="${cleanArtistName(nowPlayingSong.artist)}">` :
                 `<div class="artist-initial artist-initial-large">${artistImage}</div>`
             }
             <div class="song-info">
@@ -845,6 +883,15 @@ function renderQueue() {
                 <div class="progress-bar"></div>
             </div>
         `;
+
+        // Add error logging for failed artist images in now playing
+        const nowPlayingImg = nowPlaying.querySelector('img[data-artist-name]');
+        if (nowPlayingImg) {
+            nowPlayingImg.addEventListener('error', (e) => {
+                const artistName = e.target.getAttribute('data-artist-name');
+                console.warn(`Image load failed for artist: ${artistName}`);
+            });
+        }
 
         // Update "Up Next" header with dynamic count
         const upNextCount = queue.length - 1;
@@ -868,7 +915,7 @@ function renderQueue() {
                 const queueArtistImage = getArtistImage(cleanArtistName(item.artist));
                 li.innerHTML = `
                     ${queueArtistImage.startsWith('http') ?
-                        `<img src="${queueArtistImage}" alt="Artist Image">` :
+                        `<img src="${queueArtistImage}" alt="Artist Image" data-artist-name="${cleanArtistName(item.artist)}">` :
                         `<div class="artist-initial">${queueArtistImage}</div>`
                     }
                     <div class="song-info">
@@ -881,6 +928,15 @@ function renderQueue() {
                     </div>
                     ${isAdmin ? `<button class="remove-btn" data-queue-id="${item.id}"><i data-feather="x"></i></button>` : ''}
                 `;
+
+                // Add error logging for failed artist images in queue items
+                const queueImg = li.querySelector('img[data-artist-name]');
+                if (queueImg) {
+                    queueImg.addEventListener('error', (e) => {
+                        const artistName = e.target.getAttribute('data-artist-name');
+                        console.warn(`Image load failed for artist: ${artistName}`);
+                    });
+                }
                 upNextList.appendChild(li);
             });
 
