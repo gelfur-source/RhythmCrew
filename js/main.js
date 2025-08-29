@@ -291,10 +291,8 @@ function setupEventListeners() {
         option.addEventListener('click', () => {
             avatarOptions.forEach(opt => {
                 opt.classList.remove('selected');
-                opt.setAttribute('aria-checked', 'false');
             });
             option.classList.add('selected');
-            option.setAttribute('aria-checked', 'true');
         });
     });
 
@@ -305,44 +303,7 @@ function setupEventListeners() {
         }
     });
 
-    // Keyboard navigation support
-    modal.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            modal.style.display = 'none';
-        } else if (e.key === 'Tab') {
-            // Ensure focus stays within modal
-            const focusableElements = modal.querySelectorAll(
-                'button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
-            );
-            const firstElement = focusableElements[0];
-            const lastElement = focusableElements[focusableElements.length - 1];
 
-            if (e.shiftKey) {
-                // Shift + Tab
-                if (document.activeElement === firstElement) {
-                    lastElement.focus();
-                    e.preventDefault();
-                }
-            } else {
-                // Tab
-                if (document.activeElement === lastElement) {
-                    firstElement.focus();
-                    e.preventDefault();
-                }
-            }
-        }
-    });
-
-    // Screen reader support - announce modal opening
-    const announceModal = () => {
-        const announcement = document.createElement('div');
-        announcement.setAttribute('aria-live', 'polite');
-        announcement.setAttribute('aria-atomic', 'true');
-        announcement.className = 'sr-only';
-        announcement.textContent = 'Account settings modal opened. Use Tab to navigate, Enter to select, Escape to close.';
-        document.body.appendChild(announcement);
-        setTimeout(() => document.body.removeChild(announcement), 1000);
-    };
 
     // Sorting controls
     document.getElementById('sort-upvotes').addEventListener('click', () => sortQueue('upvotes'));
@@ -513,19 +474,15 @@ function showUserModal() {
     // Reset avatar selection
     avatarOptions.forEach(option => {
         option.classList.remove('selected');
-        option.setAttribute('aria-checked', 'false');
         if (option.textContent === currentUser.avatar) {
             option.classList.add('selected');
-            option.setAttribute('aria-checked', 'true');
         }
     });
 
     modal.style.display = 'flex';
 
-    // Focus management for accessibility
     setTimeout(() => {
         nameInput.focus();
-        announceModal();
     }, 100);
 }
 
@@ -660,7 +617,6 @@ function renderSongs(append = false) {
             songCard.className = `song-card${isQueued ? ' queued' : ''}`;
             songCard.setAttribute('data-genre', (song.genre || '').trim());
             songCard.setAttribute('data-song-id', song.id);
-            songCard.setAttribute('aria-label', `Song: ${song.cleanedName} by ${song.cleanedArtist}. ${isQueued ? 'Already in queue.' : 'Click to request.'}`);
 
             songCard.innerHTML = `
                 <div class="song-card-content">
@@ -672,7 +628,7 @@ function renderSongs(append = false) {
                     </div>
                 </div>
                 <div class="tooltip">
-                    <button class="action-button request-btn ${isQueued ? 'queued' : ''}" data-song-id="${song.id}" ${isQueued ? 'disabled' : ''} aria-label="${isQueued ? 'Remove from queue' : 'Add to queue'}">
+                    <button class="action-button request-btn ${isQueued ? 'queued' : ''}" data-song-id="${song.id}" ${isQueued ? 'disabled' : ''}>
                         ${isQueued ? '<span>Queued</span> <i data-feather="check"></i>' : '<i data-feather="plus"></i>'}
                     </button>
                     <span class="tooltip-text">${isQueued ? 'Click to remove from queue' : 'Click to add to queue'}</span>
